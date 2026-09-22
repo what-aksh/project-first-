@@ -1,0 +1,307 @@
+from collections import deque
+from dataclasses import dataclass
+from datetime import datetime
+import heapq
+
+
+@dataclass
+class Customer:
+    token: str
+    name: str
+    service: str
+    priority: bool
+    joined_at: datetime
+    status: str = "Waiting"
+
+
+class SmartQueueSystem:
+
+    def __init__(self):
+        self.normal_queue = deque()
+        self.priority_queue = []
+        self.customers = {}
+        self.completed = []
+        self.token_counter = 0
+        self.priority_counter = 0
+        self.current_customer = None
+
+    # Generate a unique token
+    def generate_token(self, service):
+        self.token_counter += 1
+        prefix = service[0].upper()
+        return f"{prefix}{self.token_counter:03d}"
+
+    # Add a customer to the queue
+    def add_customer(self, name, service, priority=False):
+        token = self.generate_token(service)
+
+        customer = Customer(
+            token=token,
+            name=name,
+            service=service,
+            priority=priority,
+            joined_at=datetime.now()
+        )
+
+        self.customers[token] = customer
+
+        if priority:
+            self.priority_counter += 1
+            heapq.heappush(
+                self.priority_queue,
+                (-1, self.priority_counter, token)
+            )
+        else:
+            self.normal_queue.append(token)
+
+        return customer
+
+    # Get the next customer
+    def get_next_token(self):
+        if self.priority_queue:
+            return heapq.heappop(self.priority_queue)[2]
+
+        if self.normal_queue:
+            return self.normal_queue.popleft()
+
+        return None
+
+    # Call the next customer
+    def call_next_customer(self):
+        if self.current_customer is not None:
+            print("A customer is already being served.")
+            return
+
+        token = self.get_next_token()
+
+        if token is None:
+            print("No customers are waiting.")
+            return
+
+        customer = self.customers[token]
+        customer.status = "Serving"
+        self.current_customer = customer
+
+        print(f"\nNow serving: {customer.token}")
+        print(f"Name: {customer.name}")
+        print(f"Service: {customer.service}")
+
+    # Complete the current service
+    def complete_current_customer(self):
+        if self.current_customer is None:
+            print("No customer is currently being served.")
+            return
+
+        customer = self.current_customer
+        customer.status = "Completed"
+        self.completed.append(customer.token)
+
+        print(f"Completed service for {customer.token}")
+
+        self.current_customer = None
+
+    # Display all waiting customers
+    def display_queue(self):
+        print("\n--- CURRENT QUEUE ---")
+
+        priority_tokens = [
+            item[2] for item in sorted(self.priority_queue)
+        ]
+
+        normal_tokens = list(self.normal_queue)
+        waiting_tokens = priority_tokens + normal_tokens
+
+        if not waiting_tokens:
+            print("The queue is empty.")
+            return
+
+        for position, token in enumerate(waiting_tokens, start=1):
+            customer = self.customers[token]
+
+            category = "Priority" if customer.priority else "Normal"
+
+            print(
+                f"{position}. {token} | "
+                f"{customer.name} | "
+                f"{customer.service} | {category}"
+            )
+
+    # Track a customer's token
+    def track_token(self, token):
+        token = token.upper()
+        customer = self.customers.get(token)
+
+        if customer is None:
+            print("Token not found.")
+            return
+
+        print(f"\nToken: {customer.token}")
+        print(f"Name: {customer.name}")
+        print(f"Service: {customer.service}")
+        print(f"Status: {customer.status}")
+
+        if customer.status == "Waiting":
+            priority_tokens = [
+                item[2] for item in sorted(self.priority_queue)
+            ]
+
+            normal_tokens = list(self.normal_queue)
+            waiting_tokens = priority_tokens + normal_tokens
+
+            position = waiting_tokens.index(token) + 1
+            print(f"Queue position: {position}")
+        else:
+            print("Queue position: Not applicable")
+
+    # Cancel a waiting token
+    def cancel_customer(self, token):
+        token = token.upper()
+        customer = self.customers.get(token)
+
+        if customer is None:
+            print("Token not found.")
+            return
+
+        if customer.status != "Waiting":
+            print("Only waiting customers can be cancelled.")
+            return
+
+        customer.status = "Cancelled"
+
+        # Remove cancelled tokens from the active queues
+        self.normal_queue = deque(
+            t for t in self.normal_queue
+            if t != token
+        )
+
+        self.priority_queue = [
+            item for item in self.priority_queue
+            if item[2] != token
+        ]
+
+        heapq.heapify(self.priority_queue)
+
+        print(f"Token {token} cancelled successfully.")
+
+    # Display statistics
+    def show_analytics(self):
+        total = len(self.customers)
+
+        waiting = sum(
+            c.status == "Waiting"
+            for c in self.customers.values()
+        )
+
+        serving = sum(
+            c.status == "Serving"
+            for c in self.customers.values()
+        )
+
+        completed = sum(
+            c.status == "Completed"
+            for c in self.customers.values()
+        )
+
+        cancelled = sum(
+            c.status == "Cancelled"
+            for c in self.customers.values()
+        )
+
+        print("\n--- QUEUE ANALYTICS ---")
+        print(f"Total tokens: {total}")
+        print(f"Waiting: {waiting}")
+        print(f"Serving: {serving}")
+        print(f"Completed: {completed}")
+        print(f"Cancelled: {cancelled}")
+
+
+def choose_service():
+    services = {
+        "1": "Accounts",
+        "2": "Examination",
+        "3": "HelpDesk"
+    }
+
+    print("\nSelect Service:")
+    for number, service in services.items():
+        print(f"{number}. {service}")
+
+    choice = input("Enter choice: ").strip()
+
+    return services.get(choice)
+
+
+def main():
+    system = SmartQueueSystem()
+
+    while True:
+        print("\n===== SMART QUEUE MANAGEMENT SYSTEM =====")
+        print("1. Generate Token")
+        print("2. Display Queue")
+        print("3. Call Next Customer")
+        print("4. Complete Current Service")
+        print("5. Track Token")
+        print("6. Cancel Token")
+        print("7. Show Analytics")
+        print("8. Exit")
+
+        choice = input("Enter your choice: ").strip()
+
+        if choice == "1":
+            name = input("Enter customer name: ").strip()
+
+            if not name:
+                print("Name cannot be empty.")
+                continue
+
+            service = choose_service()
+
+            if service is None:
+                print("Invalid service choice.")
+                continue
+
+            priority_input = input(
+                "Priority customer? (y/n): "
+            ).strip().lower()
+
+            priority = priority_input == "y"
+
+            customer = system.add_customer(
+                name, service, priority
+            )
+
+            print(
+                f"\nToken generated successfully: "
+                f"{customer.token}"
+            )
+
+        elif choice == "2":
+            system.display_queue()
+
+        elif choice == "3":
+            system.call_next_customer()
+
+        elif choice == "4":
+            system.complete_current_customer()
+
+        elif choice == "5":
+            token = input("Enter token: ").strip()
+            system.track_token(token)
+
+        elif choice == "6":
+            token = input("Enter token: ").strip()
+            system.cancel_customer(token)
+
+        elif choice == "7":
+            system.show_analytics()
+
+        elif choice == "8":
+            print("Thank you for using the system.")
+            break
+
+        else:
+            print("Invalid choice. Please try again.")
+
+
+if __name__ == "__main__":
+    main()
