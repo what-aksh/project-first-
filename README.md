@@ -320,7 +320,7 @@ Using Git and GitHub for version control.
 18. Repository
 
 GitHub Repository:
-<Add your GitHub repository link here>
+
 
 19. Project Information
 
